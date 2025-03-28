@@ -20,13 +20,18 @@ public:
     int rowEnd, colEnd;
 
     bool isDivisible;   // Default to true
+    bool isLeaf;        // Default to true
 
     // Constructor
     QuadTreeNode();
-    QuadTreeNode(int rowStart, int colStart, int rowEnd, int colEnd)
-        : rowStart(rowStart), colStart(colStart), rowEnd(rowEnd), colEnd(colEnd),
-        averageR(0), averageG(0), averageB(0), error(0), isDivisible(true) {};
+    QuadTreeNode(int rowStart, int colStart, int rowEnd, int colEnd);
     ~QuadTreeNode() {};
+
+    // Error calculation that set the error attribute
+    void calculateError(const Image& image, ErrorMethod errorMethod);
+    
+    // Average calculation that set the averageR, averageG, and averageB attributes
+    void calculateAverage(const Image& image);
 };
 
 class QuadTree {
@@ -45,8 +50,8 @@ private:
     // Divide nodes
     int divideNode(QuadTreeNode& node, int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod);
 
-    // Merge nodes
-    void mergeNode(const QuadTreeNode& node, Image& outputImage) const;
+    // Merge nodes. Calculate average RGB value from each leaf node
+    void mergeNode(QuadTreeNode& node, Image& outputImage) const;
 public:
     // Constructor and destructor
     QuadTree(const Image& image);
@@ -56,7 +61,7 @@ public:
     int getNodeCount() const;
     int getTreeDepth() const;
 
-    // Divide all divisible leaf nodes
+    // Divide all current divisible leaf nodes per level
     void divide(int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod);
 
     // Merge the current tree into an Image

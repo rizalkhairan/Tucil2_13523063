@@ -21,7 +21,11 @@ private:
     std::vector<std::vector<pixel>> r;
     std::vector<std::vector<pixel>> g;
     std::vector<std::vector<pixel>> b;
-    const std::vector<std::vector<pixel>> *getChannel(Channels channel) const;
+
+    // Modifiable access
+    std::vector<std::vector<pixel>>* getChannel(Channels channel);
+    // Read-only access
+    const std::vector<std::vector<pixel>>* getChannel(Channels channel) const;
 public:
     // Constructors and destructors
     Image(std::string address);
@@ -30,9 +34,12 @@ public:
     ~Image();
     
     // Dimension getters
-    int getSize();
-    int getWidth();
-    int getHeight();
+    int getSize() const;
+    int getWidth() const;
+    int getHeight() const;
+
+    // Pixel setters
+    void paintBlockPixel(int rowStart, int colStart, int rowEnd, int colEnd, pixel r, pixel g, pixel b, bool addBorder);
 
     // Save the image to a file
     void save(std::string address);
@@ -40,22 +47,34 @@ public:
     // For accessing all pixel values
     class Iterator {
     private:
-        const std::vector<std::vector<pixel>> *channel;
-        size_t startRow, startCol;
-        size_t endRow, endCol;
-        size_t currentRow, currentCol;
+        std::vector<std::vector<pixel>> *channel;
+        int startRow, startCol;
+        int endRow, endCol;
+        int currentRow, currentCol;
     public:
-        Iterator(const std::vector<std::vector<pixel>> *channel,
-            size_t startRow, size_t startCol,
-            size_t endRow, size_t endCol)
+        // Modifiable iterator
+        Iterator(std::vector<std::vector<pixel>> *channel,
+            int startRow, int startCol,
+            int endRow, int endCol)
             : channel(channel), startRow(startRow), startCol(startCol),
             endRow(endRow), endCol(endCol), currentRow(startRow), currentCol(startCol) {};
-            
+        // Read-only iterator
+        Iterator(const std::vector<std::vector<pixel>> *channel,
+            int startRow, int startCol,
+            int endRow, int endCol)
+            : channel(const_cast<std::vector<std::vector<pixel>> *>(channel)), startRow(startRow), startCol(startCol),
+            endRow(endRow), endCol(endCol), currentRow(startRow), currentCol(startCol) {};    
+        
         // Iterator traits
         using iterator_category = std::forward_iterator_tag;
         using value_type = pixel;
         
+        // Modifiable
+        pixel& operator*() { return (*channel)[currentRow][currentCol]; }
+        // Read-only
         pixel operator*() const { return (*channel)[currentRow][currentCol]; }
+        
+        // Iterator controls
         Iterator& operator++() {
             ++currentCol;
             if (currentCol >= endCol) { // Move to the next row
@@ -75,8 +94,12 @@ public:
     };
 
     // Use these methods to iterate over a channel of an image subblock, as to be used with the error calculation
-    Iterator beginBlock(size_t startRow, size_t startCol, size_t endRow, size_t endCol, Channels channel) const;
-    Iterator endBlock(size_t startRow, size_t startCol, size_t endRow, size_t endCol, Channels channel) const;
+    Iterator beginBlock(int startRow, int startCol, int endRow, int endCol, Channels channel);
+    Iterator endBlock(int startRow, int startCol, int endRow, int endCol, Channels channel);
+
+    // Read-only access
+    Iterator beginBlock(int startRow, int startCol, int endRow, int endCol, Channels channel) const;
+    Iterator endBlock(int startRow, int startCol, int endRow, int endCol, Channels channel) const;
 };
 
 #endif

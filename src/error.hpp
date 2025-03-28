@@ -18,7 +18,7 @@ public:
     // Used to calculate the error value of pixels based on various methods
     // Require Iterator object such as the one defined in Image::Iterator
     template <typename Iterator>
-    double calculateError(ErrorMethod method, Iterator begin, Iterator end) {
+    static double calculateChannelError(ErrorMethod method, Iterator begin, Iterator end) {
         switch (method) {
             case VARIANCE:
                 return calculateVariance(begin, end);
@@ -33,12 +33,17 @@ public:
         }
     }
 
+    // Aggregates the error values of each channel into a single value
+    static double calculateError(ErrorMethod method, double r, double g, double b) {
+        return (r + g + b) / 3;
+    }
+
 private:
     /* Error calculation */
     // Pixels should have unsigned char type
 
     template <typename Iterator>
-    double calculateVariance(Iterator begin, Iterator end) {
+    static double calculateVariance(Iterator begin, Iterator end) {
         // Variance error
         // By Var(X) = E[X^2] - E[X]^2
         double sum = 0, sumSquared = 0;
@@ -57,7 +62,7 @@ private:
     }
 
     template <typename Iterator>
-    double calculateMeanAbsoluteDeviation(Iterator begin, Iterator end) {
+    static double calculateMeanAbsoluteDeviation(Iterator begin, Iterator end) {
         // Mean Absolute Deviation error
         // By MAD(X) = E[|X - E[X]|]
         double sum = 0, mean = 0;
@@ -79,15 +84,21 @@ private:
     }
 
     template <typename Iterator>
-    double calculateMaxPixelDifference(Iterator begin, Iterator end) {
+    static double calculateMaxPixelDifference(Iterator begin, Iterator end) {
         // Max Pixel Difference error
         // By MaxDiff(X) = max(X) - min(X)
-        auto [minIt, maxIt] = std::minmax_element(begin, end);
-        return *maxIt - *minIt;
+        if (begin == end) return 0;
+
+        typename Iterator::value_type min = *begin, max = *begin;
+        for (auto it = begin; it != end; ++it) {
+            if (*it < min) min = *it;
+            if (*it > max) max = *it;
+        }
+        return max - min;
     }
 
     template <typename Iterator>
-    double calculateEntropy(Iterator begin, Iterator end) {
+    static double calculateEntropy(Iterator begin, Iterator end) {
         // Entropy error
         // By H = -Σ p(x) * log2(p(x))
 
