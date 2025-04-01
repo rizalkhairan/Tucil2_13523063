@@ -1,10 +1,11 @@
 #ifndef IMAGE_HPP
 #define IMAGE_HPP
 
-#include <vector>
-#include <iterator>
+#define cimg_display 0      // Disable CImg display methods thus not requiring X11 or gdi
+#define cimg_use_jpeg 1     // Use libjpeg for JPEG support
+#include "CImg.h"
 
-typedef unsigned char pixel;
+typedef unsigned char Quantum;      // RGB value type
 
 enum Channels {
     RED = 0,
@@ -14,22 +15,15 @@ enum Channels {
 
 class Image {
 private:
-    int width, height;      // Whole image dimensions
-    int size;               // Number of pixels in the image
-
-    // Image color channels
-    std::vector<std::vector<pixel>> r;
-    std::vector<std::vector<pixel>> g;
-    std::vector<std::vector<pixel>> b;
-
-    // Modifiable access
-    std::vector<std::vector<pixel>>* getChannel(Channels channel);
-    // Read-only access
-    const std::vector<std::vector<pixel>>* getChannel(Channels channel) const;
+    // Image object
+    cimg_library::CImg<Quantum> img;
 public:
     // Constructors and destructors
+    // From file
     Image(std::string address);
-    Image(int width, int height, pixel r, pixel g, pixel b);
+    // Image object with given dimensions and color
+    Image(int width, int height, Quantum r, Quantum g, Quantum b);
+    // Copy constructor
     Image(const Image &other);
     ~Image();
     
@@ -39,40 +33,33 @@ public:
     int getHeight() const;
 
     // Pixel setters
-    void paintBlockPixel(int rowStart, int colStart, int rowEnd, int colEnd, pixel r, pixel g, pixel b, bool addBorder);
+    void paintBlockPixel(int rowStart, int colStart, int rowEnd, int colEnd, Quantum r, Quantum g, Quantum b, bool addBorder);
 
     // Save the image to a file
     void save(std::string address);
     
-    // For accessing all pixel values
+    // For accessing pixel values
     class Iterator {
     private:
-        std::vector<std::vector<pixel>> *channel;
+        const cimg_library::CImg<Quantum>& img;
+        Channels channel;
         int startRow, startCol;
         int endRow, endCol;
         int currentRow, currentCol;
     public:
         // Modifiable iterator
-        Iterator(std::vector<std::vector<pixel>> *channel,
+        Iterator(const cimg_library::CImg<Quantum>& imgref, Channels channel,
             int startRow, int startCol,
             int endRow, int endCol)
-            : channel(channel), startRow(startRow), startCol(startCol),
-            endRow(endRow), endCol(endCol), currentRow(startRow), currentCol(startCol) {};
-        // Read-only iterator
-        Iterator(const std::vector<std::vector<pixel>> *channel,
-            int startRow, int startCol,
-            int endRow, int endCol)
-            : channel(const_cast<std::vector<std::vector<pixel>> *>(channel)), startRow(startRow), startCol(startCol),
-            endRow(endRow), endCol(endCol), currentRow(startRow), currentCol(startCol) {};    
+            : img(imgref), channel(channel), startRow(startRow), startCol(startCol),
+            endRow(endRow), endCol(endCol), currentRow(startRow), currentCol(startCol) { };
         
         // Iterator traits
-        using iterator_category = std::forward_iterator_tag;
-        using value_type = pixel;
+        using value_type = Quantum;
         
-        // Modifiable
-        pixel& operator*() { return (*channel)[currentRow][currentCol]; }
+        // Accessor methods
         // Read-only
-        pixel operator*() const { return (*channel)[currentRow][currentCol]; }
+        Quantum operator*() const { return img.atXY(currentCol, currentRow, channel); }
         
         // Iterator controls
         Iterator& operator++() {
@@ -93,11 +80,7 @@ public:
         bool operator!=(const Iterator &other) const { return !(*this == other); }
     };
 
-    // Use these methods to iterate over a channel of an image subblock, as to be used with the error calculation
-    Iterator beginBlock(int startRow, int startCol, int endRow, int endCol, Channels channel);
-    Iterator endBlock(int startRow, int startCol, int endRow, int endCol, Channels channel);
-
-    // Read-only access
+    // Use these methods to iterate over a channel of an image subblock, as to be used with the error calculation and QuadTree formation
     Iterator beginBlock(int startRow, int startCol, int endRow, int endCol, Channels channel) const;
     Iterator endBlock(int startRow, int startCol, int endRow, int endCol, Channels channel) const;
 };

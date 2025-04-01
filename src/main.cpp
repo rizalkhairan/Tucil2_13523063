@@ -3,8 +3,9 @@
 #include <chrono>
 
 // #include "quadtree.h"
-// #include "image.h"
-// #include "util.h"
+#include "image.hpp"
+#include "error.hpp"
+#include "quadtree.hpp"
 
 int main(){
     /* INPUT */
@@ -15,7 +16,7 @@ int main(){
     std::string outputImageAddress;     // Compressed image output address
 
     std::cout << "Enter the input image address: ";
-    std::cin >> inputImageAddress;
+    std::getline(std::cin, inputImageAddress);
     std::cout << "Image to be compressed is " << inputImageAddress << std::endl;
 
     std::cout << "Error method (enter the number)" << std::endl
@@ -51,6 +52,26 @@ int main(){
     std::cout << "Compression ratio: " << "x" << std::endl;
     std::cout << "Tree depth: " << "levels" << std::endl;
     std::cout << "Number of nodes: " << "nodes" << std::endl;
+
+    std::cout << "-----------------------" << std::endl;
+    
+    try
+    {
+        Image img(inputImageAddress);
+        std::cout << "Image loaded successfully!" << std::endl;
+        std::cout << "Image size: " << img.getWidth() << "x" << img.getHeight() << std::endl;
+        
+        img.paintBlockPixel(0, 0, img.getHeight()-1, img.getWidth()-1, 255, 255, 255, false);
+        
+        img.save(outputImageAddress);
+
+        std::cout << "Compressed image saved successfully!" << std::endl;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    
 
     return 0;
 }

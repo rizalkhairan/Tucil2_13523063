@@ -1,3 +1,10 @@
 .vscode
-lib
 bin
+
+# Ignore everything in the lib directory
+lib/*/*
+
+# Allow .c and .h files in the lib directory
+!lib/
+!lib/**/*.c
+!lib/**/*.h
