@@ -10,8 +10,13 @@ Image::Image(std::string address) {
     if (image.is_empty()) {
         throw std::runtime_error("Image not found or empty.");
     }
-    if (image.spectrum() != 3) {
-        throw std::runtime_error("Image is not RGB.");
+    if (image.spectrum() < 3) {
+        throw std::runtime_error("Image do not have at least RGB channels.");
+    }
+
+    // Image with alpha channel is set to opaque
+    if (image.spectrum() == 4) {
+        image.channel(Channels::ALPHA).fill(1); // Make opaque
     }
 
     this->img = image;

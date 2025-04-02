@@ -3,6 +3,7 @@
 
 #define cimg_display 0      // Disable CImg display methods thus not requiring X11 or gdi
 #define cimg_use_jpeg 1     // Use libjpeg for JPEG support
+#define cimg_use_png 1      // Use libpng for PNG support
 #include "CImg.h"
 
 typedef unsigned char Quantum;      // RGB value type
@@ -10,7 +11,8 @@ typedef unsigned char Quantum;      // RGB value type
 enum Channels {
     RED = 0,
     GREEN = 1,
-    BLUE = 2
+    BLUE = 2,
+    ALPHA = 3
 };
 
 class Image {

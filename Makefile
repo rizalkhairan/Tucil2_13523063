@@ -1,3 +1,12 @@
+# Makefile for building the C++ program
+# This program has the following dependencies:
+# - libjpeg
+# - zlib
+# - libpng
+# The libraries are built from source and linked statically.
+# This makefile is tested on Windows and WSL2
+
+# Toolchain
 CC			= gcc
 CXX			= g++
 AR			= ar rc
@@ -9,11 +18,13 @@ LIB_DIR		= lib
 BIN_DIR		= bin
 LIBJPEG_DIR	= $(LIB_DIR)/libjpeg
 LIBZ_DIR	= $(LIB_DIR)/zlib
+LIBPNG_DIR	= $(LIB_DIR)/libpng
 
 # Executable and library directory
 TARGET		= $(BIN_DIR)/main
 LIBJPEG		= $(LIBJPEG_DIR)/libjpeg.a
 LIBZ		= $(LIBZ_DIR)/libz.a
+LIBPNG		= $(LIBPNG_DIR)/libpng.a
 
 # Source files
 SRC_FILES	= $(wildcard src/*.cpp)
@@ -27,22 +38,40 @@ LIBJPEG_SRC = $(addprefix $(LIBJPEG_DIR)/, jcapimin.c jcapistd.c jccoefct.c jcco
         jquant2.c jutils.c jmemmgr.c jmemnobs.c)
 LIBZ_SRC	= $(addprefix $(LIBZ_DIR)/, adler32.c compress.c crc32.c deflate.c gzclose.c gzlib.c gzread.c gzwrite.c \
 		infback.c inffast.c inflate.c inftrees.c trees.c uncompr.c zutil.c)
+LIBPNG_SRC = $(addprefix $(LIBPNG_DIR)/, png.c pngerror.c pngget.c pngmem.c pngpread.c \
+       pngread.c pngrio.c pngrtran.c pngrutil.c pngset.c \
+       pngtrans.c pngwio.c pngwrite.c pngwtran.c pngwutil.c)
 
 # Compiler flags
-CFLAGS				= -I$(SRC_DIR) -I$(LIB_DIR) -I$(LIBJPEG_DIR)
-LIBJPEG_CFLAGS		= -I$(LIBJPEG_DIR)
-LIBZ_CFLAGS			= -I$(LIBZ_DIR) -O3 -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN -Wall
+CPPFLAGS			= -I$(SRC_DIR) -I$(LIB_DIR) -I$(LIBJPEG_DIR) -I$(LIBZ_DIR) -I$(LIBPNG_DIR)
+LIBJPEG_CPPFLAGS		= -I$(LIBJPEG_DIR)
+LIBZ_CPPFLAGS			= -I$(LIBZ_DIR) -O3 -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN
+# LIBPNG flags
+NOHWOPT			= -DPNG_ARM_NEON_OPT=0 -DPNG_MIPS_MSA_OPT=0 \
+                  -DPNG_POWERPC_VSX_OPT=0 -DPNG_INTEL_SSE_OPT=0
+STDC			= -pedantic-errors # -std=c99
+WARN			= -Wall -Wextra -Wundef
+WARNMORE		= -Wcast-align -Wconversion -Wshadow -Wpointer-arith -Wwrite-strings \
+                  -Wmissing-declarations -Wmissing-prototypes -Wstrict-prototypes
+LOCAL_CPPFLAGS	= $(NOHWOPT)
+LIBPNG_CPPFLAGS	= -I$(LIBZ_DIR) -I$(LIBPNG_DIR) # -DPNG_DEBUG=5
+ALL_CPPFLAGS	= $(LOCAL_CPPFLAGS) $(LIBPNG_CPPFLAGS)
+LOCAL_CFLAGS	= $(STDC) $(WARN) # $(WARNMORE)
+LIBPNG_CFLAGS	= $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) -O2 # -g
+LIBPNG_FLAGS	= $(LIBPNG_CPPFLAGS) $(LIBPNG_CFLAGS) 
 
-# Linker flags
-LDFLAGS			= -L$(LIBJPEG_DIR) -ljpeg
+# Linker flags. Order of -l matters.
+LDFLAGS			= -L$(LIBJPEG_DIR) -L$(LIBZ_DIR) -L$(LIBPNG_DIR) -lpng -ljpeg -lz 
 
-build: jpeg $(SRC_FILES)
-	$(CXX) -o $(TARGET) $(SRC_FILES) $(CFLAGS) $(LDFLAGS)
+all: lib build run
+
+build: $(SRC_FILES)
+	$(CXX) -o $(TARGET) $(SRC_FILES) $(CPPFLAGS) $(LDFLAGS)
+
+lib: jpeg z png
 
 run:
 	./$(TARGET)
-
-all: build run
 
 clean:
 	rm -f $(TARGET)
@@ -50,23 +79,34 @@ clean:
 	rm -f lib/*.o
 	rm -f bin/*.o
 
-# Library builds
+# --- Library builds ---
 # libjpeg.a
 # Modification:
 #	jconfig.h		-> added typedef unsigned char boolean
 #	jmoreconfig.h	-> changed into 'typedef signed int INT32' due to conflict with windows type definition
 jpeg:
 	for src in $(LIBJPEG_SRC); do \
-        $(CC) -c $$src $(LIBJPEG_CFLAGS) -o $${src%.c}.o; \
+        $(CC) -c $$src $(LIBJPEG_CPPFLAGS) -o $${src%.c}.o; \
     done; \
 	$(AR) $(LIBJPEG) $(LIBJPEG_SRC:.c=.o)
 	$(RANLIB) $(LIBJPEG)
 
 # libz.a
-# Ignore test programs (excludes minigzip, example)
+# Ignore test programs (excludes minigzip for example)
+# There is a warning when compiling zlib on Windows. Ignore it with -w
 z:
 	for src in $(LIBZ_SRC); do \
-		$(CC) -c $$src -o $${src%.c}.o; \
+		$(CC) -c $$src $(LIBZ_CPPFLAGS) -w -o $${src%.c}.o; \
 	done; \
 	$(AR) $(LIBZ) $(LIBZ_SRC:.c=.o)
 	$(RANLIB) $(LIBZ)
+
+# libpng.a
+# libz.a is not included here so the final program must be linked against it
+# Ignore test programs (excludes pngtest, pngvalid, pngcp, pngcrush, pngfixup)
+png:
+	for src in $(LIBPNG_SRC); do \
+		$(CC) -c $$src $(LIBPNG_FLAGS)  -o $${src%.c}.o; \
+	done;
+	$(AR) $(LIBPNG) $(LIBPNG_SRC:.c=.o)
+	$(RANLIB) $(LIBPNG)
