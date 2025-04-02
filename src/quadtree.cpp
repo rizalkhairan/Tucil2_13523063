@@ -33,7 +33,6 @@ void QuadTreeNode::calculateError(const Image& image, ErrorMethod errorMethod){
         image.endBlock(rowStart, colStart, rowEnd, colEnd, Channels::BLUE));
     
     error = ErrorMetrics::calculateError(errorMethod, errorR, errorG, errorB);
-    return;
 }
 
 // Average calculation that set the averageR, averageG, and averageB attributes
@@ -41,32 +40,26 @@ void QuadTreeNode::calculateAverage(const Image& image){
     averageR = 0;
     averageG = 0;
     averageB = 0;
-    long count = 0;
-
+    
+    int count = (rowEnd - rowStart + 1) * (colEnd - colStart + 1);
+    // Each channel iterated separately to optimize cache hit due to CImg data structure
     for (auto it = image.beginBlock(rowStart, colStart, rowEnd, colEnd, Channels::RED);
         it != image.endBlock(rowStart, colStart, rowEnd, colEnd, Channels::RED); ++it) {
         averageR += *it;
-        count++;
     }
     averageR /= count;
 
-    count = 0;
     for (auto it = image.beginBlock(rowStart, colStart, rowEnd, colEnd, Channels::GREEN);
         it != image.endBlock(rowStart, colStart, rowEnd, colEnd, Channels::GREEN); ++it) {
         averageG += *it;
-        count++;
     }
     averageG /= count;
 
-    count = 0;
     for (auto it = image.beginBlock(rowStart, colStart, rowEnd, colEnd, Channels::BLUE);
         it != image.endBlock(rowStart, colStart, rowEnd, colEnd, Channels::BLUE); ++it) {
         averageB += *it;
-        count++;
     }
     averageB /= count;
-    
-    return;
 }
 
 
@@ -75,8 +68,10 @@ void QuadTreeNode::calculateAverage(const Image& image){
 /* QuadTree */
 
 // Constructor and destructor
-QuadTree::QuadTree(const Image& image) : image(image), nodeCount(0), treeDepth(0) {
-    root = std::make_unique<QuadTreeNode>(0, 0, image.getHeight(), image.getWidth());
+QuadTree::QuadTree(const Image& image, int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod)
+    : image(image), nodeCount(0), treeDepth(1), minBlockWidth(minBlockWidth), minBlockHeight(minBlockHeight),
+      errorThreshold(errorThreshold), errorMethod(errorMethod) {
+    root = std::make_unique<QuadTreeNode>(0, 0, image.getHeight()-1, image.getWidth()-1);
 }
 QuadTree::~QuadTree() {}
 
@@ -88,76 +83,106 @@ int QuadTree::getTreeDepth() const { return treeDepth; }
 
 // Divide nodes per level
 // Returns the number of nodes divided
-int QuadTree::divideNode(QuadTreeNode& node, int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod) {
-    // Case 1: Node is an intermediate node
+int QuadTree::divideNode(QuadTreeNode& node) {
+    int count = 0;
     if (!node.isLeaf) {
-        int count = 0;
+        // Case 1: Inner node
+        // Count how many nodes are created on this subtree
         for (int i = 0; i < 4; i++) {
-            count += divideNode(*node.children[i], minBlockWidth, minBlockHeight, errorThreshold, errorMethod);
+            count += divideNode(*node.children[i]);
         }
-        return count;
+    } else if (!node.isDivisible) {
+        // Case 2: Node has been checked to be indivisible
+        // Node is ignored
+        count = 0;
+    } else {
+        // Case 3: Leaf node
+        // Check if it is divisible
+        node.calculateError(image, errorMethod);
+        if (node.rowEnd - node.rowStart <= minBlockHeight || node.colEnd - node.colStart <= minBlockWidth) {
+            // The node is smaller than the minimum block size
+            node.isDivisible = false;
+            count = 0;
+        } else if (node.error <= errorThreshold) {
+            // The node is below the error threshold/the pixels are similar
+            node.isDivisible = false;
+            count = 0;
+        } else {
+            // Divide the node
+            int rowMid = (node.rowStart + node.rowEnd) / 2;
+            int colMid = (node.colStart + node.colEnd) / 2;
+        
+            // Create children
+            // Divided into these 4 panels in order:
+            // 0 1
+            // 2 3
+            node.isLeaf = false;
+            node.children[0] = std::make_unique<QuadTreeNode>(node.rowStart, node.colStart, rowMid, colMid);
+            node.children[1] = std::make_unique<QuadTreeNode>(node.rowStart, colMid+1, rowMid, node.colEnd);
+            node.children[2] = std::make_unique<QuadTreeNode>(rowMid+1, node.colStart, node.rowEnd, colMid);
+            node.children[3] = std::make_unique<QuadTreeNode>(rowMid+1, colMid+1, node.rowEnd, node.colEnd);
+        
+            count = 4;
+        }
+    
     }
-
-    // Case 2: Node is a leaf node (divide if necessary)
-    if (!node.isDivisible) return 0;    // Node is immediately ignored
-
-    if (node.rowEnd - node.rowStart <= minBlockHeight || node.colEnd - node.colStart <= minBlockWidth) {
-        // The node is smaller than the minimum block size
-        node.isDivisible = false;
-        return 0;
-    }
-
-    node.calculateError(image, errorMethod);
-    if (node.error <= errorThreshold) {
-        // The node is below the error threshold/the pixels are similar
-        node.isDivisible = false;
-        return 0;
-    }
-
-    // Divide the node
-    int rowMid = (node.rowStart + node.rowEnd) / 2;
-    int colMid = (node.colStart + node.colEnd) / 2;
-
-    // Create children
-    // Divided into these 4 panels in order:
-    // 0 1
-    // 2 3
-    node.isLeaf = false;
-    node.children[0] = std::make_unique<QuadTreeNode>(node.rowStart, node.colStart, rowMid, colMid);
-    node.children[1] = std::make_unique<QuadTreeNode>(node.rowStart, colMid+1, rowMid, node.colEnd);
-    node.children[2] = std::make_unique<QuadTreeNode>(rowMid+1, node.colStart, node.rowEnd, colMid);
-    node.children[3] = std::make_unique<QuadTreeNode>(rowMid+1, colMid+1, node.rowEnd, node.colEnd);
-
-    return 4;
+    return count;
 }
 
 // Merge nodes. Calculate average RGB value from each leaf node
-void QuadTree::mergeNode(QuadTreeNode& node, Image& outputImage) const {
-    if (node.isLeaf) {
+void QuadTree::mergeNode(QuadTreeNode& node, Image& outputImage, int depth) const {
+    // depth == 0   : Do nothing
+    // depth == 1   : Fill the block with the average color
+    // depth > 1    : Merge children nodes if exist
+    // depth == -1  : Merge all leaf nodes
+
+    // node.isLeaf is only set to false when children of a node are created
+
+    if (depth == 0) {
+        // Do nothing
+    } else if (depth == 1 || node.isLeaf) {
         // Fill the block with the average color
         node.calculateAverage(outputImage);
         outputImage.paintBlockPixel(node.rowStart, node.colStart, node.rowEnd, node.colEnd,
             node.averageR, node.averageG, node.averageB, false);
-        return;
-    }
-
-    // Merge children
-    for (int i = 0; i < 4; i++) {
-        mergeNode(*node.children[i], outputImage);
+    } else if (depth > 1 && !node.isLeaf) {
+        // Merge nodes up to a certain depth which may not be leaf nodes
+        for (int i = 0; i < 4; i++) {
+            mergeNode(*node.children[i], outputImage, depth-1);
+        }
+    } else if (depth == -1 && !node.isLeaf) {
+        for (int i = 0; i < 4; i++) {
+            mergeNode(*node.children[i], outputImage, depth);
+        }
     }
 }
 
 // Divide all current divisible leaf nodes per level
-void QuadTree::divide(int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod) {
-    int count;
-    count = divideNode(*root, minBlockWidth, minBlockHeight, errorThreshold, errorMethod);
+int QuadTree::divide() {
+    int count = divideNode(*root);
     nodeCount += count;
-    treeDepth++;
+    if (count > 0) { treeDepth++; }
+    return count;
 }
 
-// Merge the current tree into an Image
-Image QuadTree::merge() const {
+// Divide until exhaustion
+void QuadTree::divideExhaust() {
+    // Divide until no more nodes can be divided
+    int count;
+    do {
+        count = divide();
+    } while (count > 0 && treeDepth < QUADTREE_MAX_DEPTH);
+}
+
+// Merge the current tree into an Image up to a certain depth
+Image QuadTree::merge(int depth=-1) const {
     Image outputImage(image.getWidth(), image.getHeight(), 0, 0, 0);
-    mergeNode(*root, outputImage);
-    return std::move(outputImage);
+    if (depth < -1) {
+        throw std::invalid_argument("Depth must be greater than or equal to -1.");
+    }
+    if (depth > treeDepth) {
+        throw std::invalid_argument("Depth must be less than or equal to the current tree depth.");
+    }
+    mergeNode(*root, outputImage, depth);
+    return outputImage;
 }

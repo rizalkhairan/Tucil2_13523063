@@ -6,6 +6,8 @@
 #include "image.hpp"
 #include "error.hpp"
 
+#define QUADTREE_MAX_DEPTH 100
+
 class QuadTreeNode {
 public:
     // Children
@@ -46,15 +48,21 @@ private:
     int nodeCount;  // Root, leaves and internal nodes
     int treeDepth;  // Incremented with each divide call
 
+    // Compression parameters
+    int minBlockWidth;
+    int minBlockHeight;
+    double errorThreshold;
+    ErrorMethod errorMethod;
 
     // Divide nodes
-    int divideNode(QuadTreeNode& node, int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod);
+    int divideNode(QuadTreeNode& node);
 
     // Merge nodes. Calculate average RGB value from each leaf node
-    void mergeNode(QuadTreeNode& node, Image& outputImage) const;
+    void mergeNode(QuadTreeNode& node, Image& outputImage, int depth) const;
+
 public:
     // Constructor and destructor
-    QuadTree(const Image& image);
+    QuadTree(const Image& image, int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod);
     ~QuadTree();
 
     // Getters
@@ -62,10 +70,14 @@ public:
     int getTreeDepth() const;
 
     // Divide all current divisible leaf nodes per level
-    void divide(int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod);
+    int divide();
 
+    // Divide until exhaustion
+    void divideExhaust();
+    
     // Merge the current tree into an Image
-    Image merge() const;
+    Image merge(int depth) const;
+
 };
 
 #endif
