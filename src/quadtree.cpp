@@ -107,8 +107,14 @@ int QuadTree::divideNode(QuadTreeNode& node) {
         // Case 3: Leaf node
         // Check if it is divisible
         node.calculateError(image, errorMethod);
-        if ((node.rowEnd - node.rowStart + 1) * (node.colEnd - node.colStart + 1) < minBlockArea) {
-            // The node is smaller than the minimum block size
+        int rowMid = (node.rowStart + node.rowEnd) / 2;
+        int colMid = (node.colStart + node.colEnd) / 2;
+        if ((node.rowEnd - node.rowStart + 1) * (node.colEnd - node.colStart + 1) <= minBlockArea) {
+            // The node is not larger than the minimum block size
+            node.isDivisible = false;
+            count = 0;
+        } else if ((node.colEnd-node.colStart) * (node.rowEnd-node.rowStart) / 4 < minBlockArea) {
+            // If divided, the node will be smaller than the minimum block size
             node.isDivisible = false;
             count = 0;
         } else if (node.error <= errorThreshold) {
@@ -117,8 +123,6 @@ int QuadTree::divideNode(QuadTreeNode& node) {
             count = 0;
         } else {
             // Divide the node
-            int rowMid = (node.rowStart + node.rowEnd) / 2;
-            int colMid = (node.colStart + node.colEnd) / 2;
         
             // Create children
             // Divided into these 4 panels in order:
