@@ -44,26 +44,40 @@ void QuadTreeNode::calculateAverage(const Image& image){
     averageR = 0;
     averageG = 0;
     averageB = 0;
-    
-    int count = (rowEnd - rowStart + 1) * (colEnd - colStart + 1);
-    // Each channel iterated separately to optimize cache hit due to CImg data structure
-    for (auto it = image.beginBlock(rowStart, colStart, rowEnd, colEnd, Channels::RED);
-        it != image.endBlock(rowStart, colStart, rowEnd, colEnd, Channels::RED); ++it) {
-        averageR += *it;
-    }
-    averageR /= count;
-
-    for (auto it = image.beginBlock(rowStart, colStart, rowEnd, colEnd, Channels::GREEN);
+    int count = getArea();
+    if (isLeaf) {
+        // Each channel iterated separately to optimize cache hit due to CImg data structure
+        for (auto it = image.beginBlock(rowStart, colStart, rowEnd, colEnd, Channels::RED);
+            it != image.endBlock(rowStart, colStart, rowEnd, colEnd, Channels::RED); ++it) {
+            averageR += *it;
+        }
+        for (auto it = image.beginBlock(rowStart, colStart, rowEnd, colEnd, Channels::GREEN);
         it != image.endBlock(rowStart, colStart, rowEnd, colEnd, Channels::GREEN); ++it) {
-        averageG += *it;
-    }
-    averageG /= count;
-
-    for (auto it = image.beginBlock(rowStart, colStart, rowEnd, colEnd, Channels::BLUE);
+            averageG += *it;
+        }
+        for (auto it = image.beginBlock(rowStart, colStart, rowEnd, colEnd, Channels::BLUE);
         it != image.endBlock(rowStart, colStart, rowEnd, colEnd, Channels::BLUE); ++it) {
-        averageB += *it;
+            averageB += *it;
+        }
+
+        averageR /= count;
+        averageG /= count;
+        averageB /= count;
+    } else {
+        // Calculate average by way of weighted average of children
+        for (int i = 0; i < 4; i++) {
+            if (children[i] == nullptr) {
+                throw std::runtime_error("Child node is null.");
+            }
+            children[i]->calculateAverage(image);
+            averageR += children[i]->averageR * children[i]->getArea();
+            averageG += children[i]->averageG * children[i]->getArea();
+            averageB += children[i]->averageB * children[i]->getArea();
+        }
+        averageR /= count;
+        averageG /= count;
+        averageB /= count;
     }
-    averageB /= count;
 
 }
 
@@ -74,15 +88,29 @@ void QuadTreeNode::calculateAverage(const Image& image){
 
 // Constructor and destructor
 QuadTree::QuadTree(const Image& image, int minBlockArea, double errorThreshold, ErrorMethod errorMethod)
-    : image(image), nodeCount(1), treeDepth(1), minBlockArea(minBlockArea),
-      errorThreshold(errorThreshold), errorMethod(errorMethod) {
+    : image(image), nodeCount(1), treeDepth(1), depthOnLastColorCalc(0),
+    minBlockArea(minBlockArea), errorThreshold(errorThreshold), errorMethod(errorMethod) {
     root = std::make_unique<QuadTreeNode>(0, 0, image.getHeight()-1, image.getWidth()-1);
+    root->calculateError(image, errorMethod);
 }
 QuadTree::~QuadTree() {}
 
 // Getters
 int QuadTree::getNodeCount() const { return nodeCount; }
 int QuadTree::getTreeDepth() const { return treeDepth; }
+
+// Calculate average color of all nodes
+void QuadTree::calculateAverageColor() const {
+    if (root == nullptr) {
+        throw std::runtime_error("Root node is null.");
+    }
+    if (depthOnLastColorCalc == treeDepth) {
+        // Average color already calculated
+        return;
+    }
+    // Recursively calculate average color for each node
+    root->calculateAverage(image);
+}
 
 /* Divide and conquer */
 
@@ -106,10 +134,7 @@ int QuadTree::divideNode(QuadTreeNode& node) {
     } else {
         // Case 3: Leaf node
         // Check if it is divisible
-        node.calculateError(image, errorMethod);
-        int rowMid = (node.rowStart + node.rowEnd) / 2;
-        int colMid = (node.colStart + node.colEnd) / 2;
-        if ((node.rowEnd - node.rowStart + 1) * (node.colEnd - node.colStart + 1) <= minBlockArea) {
+        if (node.getArea() <= minBlockArea) {
             // The node is not larger than the minimum block size
             node.isDivisible = false;
             count = 0;
@@ -123,6 +148,8 @@ int QuadTree::divideNode(QuadTreeNode& node) {
             count = 0;
         } else {
             // Divide the node
+            int rowMid = (node.rowStart + node.rowEnd) / 2;
+            int colMid = (node.colStart + node.colEnd) / 2;
         
             // Create children
             // Divided into these 4 panels in order:
@@ -134,6 +161,13 @@ int QuadTree::divideNode(QuadTreeNode& node) {
             node.children[2] = std::make_unique<QuadTreeNode>(rowMid+1, node.colStart, node.rowEnd, colMid);
             node.children[3] = std::make_unique<QuadTreeNode>(rowMid+1, colMid+1, node.rowEnd, node.colEnd);
         
+            for (int i = 0; i < 4; i++) {
+                if (node.children[i] == nullptr) {
+                    throw std::runtime_error("Child node is null.");
+                }
+                // Calculate error for each child node
+                node.children[i]->calculateError(image, errorMethod);
+            }
             count = 4;
         }
     
@@ -142,7 +176,7 @@ int QuadTree::divideNode(QuadTreeNode& node) {
 }
 
 // Merge nodes. Calculate average RGB value from each leaf node
-void QuadTree::mergeNode(QuadTreeNode& node, Image& outputImage, int depth) const {
+void QuadTree::mergeNodeDepth(QuadTreeNode& node, Image& outputImage, int depth) const {
     // depth == 0   : Do nothing
     // depth == 1   : Fill the block with the average color
     // depth > 1    : Merge children nodes if exist
@@ -154,17 +188,30 @@ void QuadTree::mergeNode(QuadTreeNode& node, Image& outputImage, int depth) cons
         // Do nothing
     } else if (depth == 1 || node.isLeaf) {
         // Fill the block with the average color
-        node.calculateAverage(outputImage);
+        // Average color should already be calculated
         outputImage.paintBlockPixel(node.rowStart, node.colStart, node.rowEnd, node.colEnd,
             node.averageR, node.averageG, node.averageB, false);
-    } else if (depth > 1 && !node.isLeaf) {
+    } else if ((depth > 1 || depth == -1) && !node.isLeaf) {
         // Merge nodes up to a certain depth which may not be leaf nodes
+        // Or merge all leaf nodes
         for (int i = 0; i < 4; i++) {
-            mergeNode(*node.children[i], outputImage, depth-1);
+            mergeNodeDepth(*node.children[i], outputImage, depth-1);
         }
-    } else if (depth == -1 && !node.isLeaf) {
+    }
+}
+
+// Merge nodes on variable error threshold
+void QuadTree::mergeNodeThreshold(QuadTreeNode& node, Image& outputImage, double errorThreshold) const {
+    // Blocks that already have low error is immediately merged even if it has children
+    if (node.error < errorThreshold || node.isLeaf) {
+        // Fill the block with the average color
+        // Average color should already be calculated
+        outputImage.paintBlockPixel(node.rowStart, node.colStart, node.rowEnd, node.colEnd,
+            node.averageR, node.averageG, node.averageB, false);
+    } else if (!node.isLeaf) {
+        // Merge children nodes
         for (int i = 0; i < 4; i++) {
-            mergeNode(*node.children[i], outputImage, depth);
+            mergeNodeThreshold(*node.children[i], outputImage, errorThreshold);
         }
     }
 }
@@ -196,6 +243,21 @@ Image QuadTree::merge(int depth=-1) const {
     if (depth > treeDepth) {
         throw std::invalid_argument("Depth must be less than or equal to the current tree depth.");
     }
-    mergeNode(*root, outputImage, depth);
+
+    calculateAverageColor(); // Calculate average color for each node
+    mergeNodeDepth(*root, outputImage, depth);
+    return outputImage;
+}
+
+// Merge with variable error threshold
+Image QuadTree::mergeThreshold(double errorThreshold) const {
+    // Create a copy of the original image
+    Image outputImage = image;
+    if (errorThreshold < 0) {
+        throw std::invalid_argument("Error threshold must be greater than or equal to 0.");
+    }
+
+    calculateAverageColor(); // Calculate average color for each node
+    mergeNodeThreshold(*root, outputImage, errorThreshold);
     return outputImage;
 }

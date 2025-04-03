@@ -29,6 +29,11 @@ public:
     QuadTreeNode(int rowStart, int colStart, int rowEnd, int colEnd);
     ~QuadTreeNode() {};
 
+    // Dimension getter
+    int getWidth() const { return colEnd - colStart + 1; }
+    int getHeight() const { return rowEnd - rowStart + 1; }
+    int getArea() const { return getWidth() * getHeight(); }
+
     // Error calculation that set the error attribute
     void calculateError(const Image& image, ErrorMethod errorMethod);
     
@@ -47,17 +52,24 @@ private:
     // Tree information
     int nodeCount;  // Root, leaves and internal nodes
     int treeDepth;  // Incremented with each divide call
+    int depthOnLastColorCalc; // Depth of the last average color calculation
 
     // Compression parameters
     int minBlockArea;
     double errorThreshold;
     ErrorMethod errorMethod;
 
+    // Calculate all node's average color
+    void calculateAverageColor() const;
+
     // Divide nodes
     int divideNode(QuadTreeNode& node);
 
-    // Merge nodes. Calculate average RGB value from each leaf node
-    void mergeNode(QuadTreeNode& node, Image& outputImage, int depth) const;
+    // Merge nodes up to variable depth. Calculate average RGB value from each leaf node
+    void mergeNodeDepth(QuadTreeNode& node, Image& outputImage, int depth) const;
+
+    // Merge nodes on variable error threshold
+    void mergeNodeThreshold(QuadTreeNode& node, Image& outputImage, double errorThreshold) const;
 
 public:
     // Constructor and destructor
@@ -76,6 +88,9 @@ public:
     
     // Merge the current tree into an Image
     Image merge(int depth) const;
+
+    // Merge with variable error threshold
+    Image mergeThreshold(double errorThreshold) const;
 
 };
 
