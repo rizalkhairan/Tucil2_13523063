@@ -49,8 +49,7 @@ private:
     int treeDepth;  // Incremented with each divide call
 
     // Compression parameters
-    int minBlockWidth;
-    int minBlockHeight;
+    int minBlockArea;
     double errorThreshold;
     ErrorMethod errorMethod;
 
@@ -62,7 +61,7 @@ private:
 
 public:
     // Constructor and destructor
-    QuadTree(const Image& image, int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod);
+    QuadTree(const Image& image, int minBlockSize, double errorThreshold, ErrorMethod errorMethod);
     ~QuadTree();
 
     // Getters

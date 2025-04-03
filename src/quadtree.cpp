@@ -1,6 +1,5 @@
 #include "quadtree.hpp"
 #include "image.hpp"
-#include <iostream>
 
 /* QuadTreeNode */
 QuadTreeNode::QuadTreeNode()
@@ -66,7 +65,6 @@ void QuadTreeNode::calculateAverage(const Image& image){
     }
     averageB /= count;
 
-    // std::cout << "Average color of the node: " << averageR << ", " << averageG << ", " << averageB << std::endl;
 }
 
 
@@ -75,8 +73,8 @@ void QuadTreeNode::calculateAverage(const Image& image){
 /* QuadTree */
 
 // Constructor and destructor
-QuadTree::QuadTree(const Image& image, int minBlockWidth, int minBlockHeight, double errorThreshold, ErrorMethod errorMethod)
-    : image(image), nodeCount(0), treeDepth(1), minBlockWidth(minBlockWidth), minBlockHeight(minBlockHeight),
+QuadTree::QuadTree(const Image& image, int minBlockArea, double errorThreshold, ErrorMethod errorMethod)
+    : image(image), nodeCount(1), treeDepth(1), minBlockArea(minBlockArea),
       errorThreshold(errorThreshold), errorMethod(errorMethod) {
     root = std::make_unique<QuadTreeNode>(0, 0, image.getHeight()-1, image.getWidth()-1);
 }
@@ -109,7 +107,7 @@ int QuadTree::divideNode(QuadTreeNode& node) {
         // Case 3: Leaf node
         // Check if it is divisible
         node.calculateError(image, errorMethod);
-        if (node.rowEnd - node.rowStart <= minBlockHeight || node.colEnd - node.colStart <= minBlockWidth) {
+        if ((node.rowEnd - node.rowStart + 1) * (node.colEnd - node.colStart + 1) < minBlockArea) {
             // The node is smaller than the minimum block size
             node.isDivisible = false;
             count = 0;
