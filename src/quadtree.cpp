@@ -1,5 +1,6 @@
 #include "quadtree.hpp"
 #include "image.hpp"
+#include <iostream>
 
 /* QuadTreeNode */
 QuadTreeNode::QuadTreeNode()
@@ -20,6 +21,10 @@ QuadTreeNode::QuadTreeNode(int rowStart, int colStart, int rowEnd, int colEnd)
 
 // Error calculation that set the error attribute
 void QuadTreeNode::calculateError(const Image& image, ErrorMethod errorMethod){
+    if (rowStart < 0 || colStart < 0 || rowEnd >= image.getHeight() || colEnd >= image.getWidth()) {
+        throw std::out_of_range("Block dimensions are out of bounds.");
+    }
+
     double errorR, errorG, errorB;
 
     errorR = ErrorMetrics::calculateChannelError(errorMethod,
@@ -60,6 +65,8 @@ void QuadTreeNode::calculateAverage(const Image& image){
         averageB += *it;
     }
     averageB /= count;
+
+    // std::cout << "Average color of the node: " << averageR << ", " << averageG << ", " << averageB << std::endl;
 }
 
 
@@ -89,6 +96,9 @@ int QuadTree::divideNode(QuadTreeNode& node) {
         // Case 1: Inner node
         // Count how many nodes are created on this subtree
         for (int i = 0; i < 4; i++) {
+            if (node.children[i] == nullptr) {
+                throw std::runtime_error("Child node is null.");
+            }
             count += divideNode(*node.children[i]);
         }
     } else if (!node.isDivisible) {
@@ -176,7 +186,8 @@ void QuadTree::divideExhaust() {
 
 // Merge the current tree into an Image up to a certain depth
 Image QuadTree::merge(int depth=-1) const {
-    Image outputImage(image.getWidth(), image.getHeight(), 0, 0, 0);
+    // Create a copy of the original image
+    Image outputImage = image;
     if (depth < -1) {
         throw std::invalid_argument("Depth must be greater than or equal to -1.");
     }

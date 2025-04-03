@@ -5,6 +5,7 @@
 #define cimg_use_jpeg 1     // Use libjpeg for JPEG support
 #define cimg_use_png 1      // Use libpng for PNG support
 #include "CImg.h"
+#include <stdexcept>
 
 typedef unsigned char Quantum;      // RGB value type
 
@@ -61,18 +62,19 @@ public:
         
         // Accessor methods
         // Read-only
-        Quantum operator*() const { return img.atXY(currentCol, currentRow, channel); }
+        Quantum operator*() const {
+            if (currentRow < startRow || currentRow > endRow || currentCol < startCol || currentCol > endCol) {
+                throw std::out_of_range("Iterator out of bounds.");
+            }
+            return img(currentCol, currentRow, 0, channel);
+        }
         
         // Iterator controls
         Iterator& operator++() {
             ++currentCol;
-            if (currentCol >= endCol) { // Move to the next row
+            if (currentCol > endCol) {  // Move to the next row
                 currentCol = startCol;
                 ++currentRow;
-            }
-            if (currentRow >= endRow) { // Sentinel. Move to the end
-                currentRow = endRow;
-                currentCol = endCol;
             }
             return *this;
         }

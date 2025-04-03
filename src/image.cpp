@@ -52,7 +52,7 @@ void Image::paintBlockPixel(int rowStart, int colStart, int rowEnd, int colEnd, 
 
     // Set the pixel values in the specified block
     Quantum pixel[3] = { r, g, b };
-    img.draw_rectangle(colStart, rowStart, colEnd - 1, rowEnd - 1, pixel);
+    img.draw_rectangle(colStart, rowStart, colEnd, rowEnd, pixel);
 
     // Add border if requested
     if (addBorder) {
@@ -77,5 +77,5 @@ Image::Iterator Image::beginBlock(int startRow, int startCol, int endRow, int en
     return Image::Iterator(img, channel, startRow, startCol, endRow, endCol);
 }
 Image::Iterator Image::endBlock(int startRow, int startCol, int endRow, int endCol, Channels channel) const {
-    return Image::Iterator(img, channel, endRow, endCol, endRow, endCol);
+    return Image::Iterator(img, channel, endRow+1, startCol, endRow+1, startCol);
 }

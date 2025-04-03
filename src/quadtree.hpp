@@ -6,7 +6,7 @@
 #include "image.hpp"
 #include "error.hpp"
 
-#define QUADTREE_MAX_DEPTH 100
+#define QUADTREE_MAX_DEPTH 50
 
 class QuadTreeNode {
 public:
