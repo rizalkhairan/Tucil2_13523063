@@ -66,10 +66,10 @@ private:
     int divideNode(QuadTreeNode& node);
 
     // Merge nodes up to variable depth. Calculate average RGB value from each leaf node
-    void mergeNodeDepth(QuadTreeNode& node, Image& outputImage, int depth) const;
+    void mergeNodeDepth(QuadTreeNode& node, Image& outputImage, int depth, bool addBorder) const;
 
     // Merge nodes on variable error threshold
-    void mergeNodeThreshold(QuadTreeNode& node, Image& outputImage, double errorThreshold) const;
+    void mergeNodeThreshold(QuadTreeNode& node, Image& outputImage, double errorThreshold, bool addBorder) const;
 
 public:
     // Constructor and destructor
@@ -87,10 +87,10 @@ public:
     void divideExhaust();
     
     // Merge the current tree into an Image
-    Image merge(int depth) const;
+    Image merge(int depth=-1, bool addBorder=false) const;
 
     // Merge with variable error threshold
-    Image mergeThreshold(double errorThreshold) const;
+    Image mergeThreshold(double errorThreshold, bool addBorder=false) const;
 
 };
 

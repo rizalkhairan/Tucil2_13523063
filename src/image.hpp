@@ -5,10 +5,12 @@
 #define cimg_use_jpeg 1     // Use libjpeg for JPEG support
 #define cimg_use_png 1      // Use libpng for PNG support
 #include "CImg.h"
+
 #include <stdexcept>
 
-typedef unsigned char Quantum;      // RGB value type
+typedef unsigned char Quantum;      // Unit of subpixel value
 
+// Channel index e.g. index 0 is used to access the red channel of a pixel
 enum Channels {
     RED = 0,
     GREEN = 1,
@@ -50,7 +52,7 @@ public:
         int endRow, endCol;
         int currentRow, currentCol;
     public:
-        // Modifiable iterator
+        // Read only iterator
         Iterator(const cimg_library::CImg<Quantum>& imgref, Channels channel,
             int startRow, int startCol,
             int endRow, int endCol)
@@ -59,6 +61,7 @@ public:
         
         // Iterator traits
         using value_type = Quantum;
+        using iterator_category = std::input_iterator_tag;
         
         // Accessor methods
         // Read-only
@@ -76,6 +79,7 @@ public:
                 currentCol = startCol;
                 ++currentRow;
             }
+            // end iterator must be the increment of currentRow==endRow and currentCol==endCol to act as stop condition
             return *this;
         }
         bool operator==(const Iterator &other) const {

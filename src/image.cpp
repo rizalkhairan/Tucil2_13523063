@@ -1,6 +1,5 @@
 #include <stdexcept>
 #include <string>
-#include <iostream>
 #include "image.hpp"
 
 // Constructors and destructors
@@ -16,7 +15,7 @@ Image::Image(std::string address) {
 
     // Image with alpha channel is set to opaque
     if (image.spectrum() == 4) {
-        image.channel(Channels::ALPHA).fill(1); // Make opaque
+        image.channel(Channels::ALPHA).fill(1);
     }
 
     this->img = image;
@@ -24,7 +23,7 @@ Image::Image(std::string address) {
 }
 // Image object with given dimensions and color
 Image::Image(int width, int height, Quantum r, Quantum g, Quantum b) {
-    cimg_library::CImg<Quantum> image(width, height, 1, 3, 0);
+    cimg_library::CImg<Quantum> image(width, height, 1, 3, 0);  // width, height, depth, channel count, pixel initial value
     Quantum pixel[3] = { r, g, b };
     image.draw_rectangle(0, 0, width - 1, height - 1, pixel);
     
@@ -56,11 +55,15 @@ void Image::paintBlockPixel(int rowStart, int colStart, int rowEnd, int colEnd, 
 
     // Add border if requested
     if (addBorder) {
+        // Thin (1 pixel) black border on top and right side of the block
+        // Does not paint border on image border
         Quantum borderPixel[3] = { 0, 0, 0 }; // Black border
-        img.draw_rectangle(colStart, rowStart, colEnd - 1, rowStart + 1, borderPixel); // Top border
-        img.draw_rectangle(colStart, rowEnd - 1, colEnd - 1, rowEnd, borderPixel); // Bottom border
-        img.draw_rectangle(colStart, rowStart, colStart + 1, rowEnd - 1, borderPixel); // Left border
-        img.draw_rectangle(colEnd - 1, rowStart, colEnd, rowEnd - 1, borderPixel); // Right border
+        if (rowStart != 0) {
+            img.draw_rectangle(colStart, rowStart, colEnd, rowStart, borderPixel); // Top border
+        }
+        if (colEnd != img.width() - 1) {
+            img.draw_rectangle(colEnd, rowStart, colEnd, rowEnd, borderPixel); // Right border
+        }
     }
 }
 

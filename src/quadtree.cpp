@@ -176,7 +176,7 @@ int QuadTree::divideNode(QuadTreeNode& node) {
 }
 
 // Merge nodes. Calculate average RGB value from each leaf node
-void QuadTree::mergeNodeDepth(QuadTreeNode& node, Image& outputImage, int depth) const {
+void QuadTree::mergeNodeDepth(QuadTreeNode& node, Image& outputImage, int depth, bool addBorder) const {
     // depth == 0   : Do nothing
     // depth == 1   : Fill the block with the average color
     // depth > 1    : Merge children nodes if exist
@@ -190,28 +190,32 @@ void QuadTree::mergeNodeDepth(QuadTreeNode& node, Image& outputImage, int depth)
         // Fill the block with the average color
         // Average color should already be calculated
         outputImage.paintBlockPixel(node.rowStart, node.colStart, node.rowEnd, node.colEnd,
-            node.averageR, node.averageG, node.averageB, false);
-    } else if ((depth > 1 || depth == -1) && !node.isLeaf) {
+            node.averageR, node.averageG, node.averageB, addBorder);
+    } else if (depth > 1 && !node.isLeaf) {
         // Merge nodes up to a certain depth which may not be leaf nodes
         // Or merge all leaf nodes
         for (int i = 0; i < 4; i++) {
-            mergeNodeDepth(*node.children[i], outputImage, depth-1);
+            mergeNodeDepth(*node.children[i], outputImage, depth-1, addBorder);
+        }
+    } else if (depth == -1 && !node.isLeaf){
+        for (int i = 0; i < 4; i++) {
+            mergeNodeDepth(*node.children[i], outputImage, depth, addBorder);
         }
     }
 }
 
 // Merge nodes on variable error threshold
-void QuadTree::mergeNodeThreshold(QuadTreeNode& node, Image& outputImage, double errorThreshold) const {
+void QuadTree::mergeNodeThreshold(QuadTreeNode& node, Image& outputImage, double errorThreshold, bool addBorder) const {
     // Blocks that already have low error is immediately merged even if it has children
     if (node.error < errorThreshold || node.isLeaf) {
         // Fill the block with the average color
         // Average color should already be calculated
         outputImage.paintBlockPixel(node.rowStart, node.colStart, node.rowEnd, node.colEnd,
-            node.averageR, node.averageG, node.averageB, false);
+            node.averageR, node.averageG, node.averageB, addBorder);
     } else if (!node.isLeaf) {
         // Merge children nodes
         for (int i = 0; i < 4; i++) {
-            mergeNodeThreshold(*node.children[i], outputImage, errorThreshold);
+            mergeNodeThreshold(*node.children[i], outputImage, errorThreshold, addBorder);
         }
     }
 }
@@ -234,7 +238,7 @@ void QuadTree::divideExhaust() {
 }
 
 // Merge the current tree into an Image up to a certain depth
-Image QuadTree::merge(int depth=-1) const {
+Image QuadTree::merge(int depth, bool addBorder) const {
     // Create a copy of the original image
     Image outputImage = image;
     if (depth < -1) {
@@ -245,12 +249,12 @@ Image QuadTree::merge(int depth=-1) const {
     }
 
     calculateAverageColor(); // Calculate average color for each node
-    mergeNodeDepth(*root, outputImage, depth);
+    mergeNodeDepth(*root, outputImage, depth, addBorder);
     return outputImage;
 }
 
 // Merge with variable error threshold
-Image QuadTree::mergeThreshold(double errorThreshold) const {
+Image QuadTree::mergeThreshold(double errorThreshold, bool addBorder) const {
     // Create a copy of the original image
     Image outputImage = image;
     if (errorThreshold < 0) {
@@ -258,6 +262,6 @@ Image QuadTree::mergeThreshold(double errorThreshold) const {
     }
 
     calculateAverageColor(); // Calculate average color for each node
-    mergeNodeThreshold(*root, outputImage, errorThreshold);
+    mergeNodeThreshold(*root, outputImage, errorThreshold, addBorder);
     return outputImage;
 }
