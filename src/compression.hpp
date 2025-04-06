@@ -6,10 +6,15 @@
 #include "image.hpp"
 #include "quadtree.hpp"
 
+#define GIF_QUALITY 10               // 1..30 with 1 being the best quality
+#define GIF_DELAY 50                 // Delay in 0.01s units
+#define GIF_LOOP_DELAY 400
+
 // Parameters
 struct CompressionConfig {
     std::string inputImageAddress="";       // Image to be compressed
     std::string outputImageAddress="";      // Compressed image output address
+    std::string outputGIFAddress="";        // GIF output address
     std::string extension=".jpg";           // Target file extension
     double errorThreshold=0.0;              // Error threshold for block division
     double compressionTarget=0.0;           // Compression percentage target (not implemented yet)
@@ -42,6 +47,8 @@ public:
 
     // Finalize the compression process and save the image
     void save();
+    // Form GIF image that visualizes the compression process
+    void formGIF();
 
     // Compression information
     long long getOriginalSize() const;

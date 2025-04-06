@@ -33,6 +33,9 @@ int main(){
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Clear the input buffer
     std::cout << "Enter the output image address: ";
     std::getline(std::cin, config.outputImageAddress);
+
+    std::cout << "Enter the GIF output address (optional, press enter to skip): ";
+    std::getline(std::cin, config.outputGIFAddress);
     
     /* PROCESS */
     Compression compression(config);
@@ -54,6 +57,16 @@ int main(){
     /* OUTPUT */
     std::cout << "Saving compressed image..." << std::endl;
     compression.save();
+    if (!config.outputGIFAddress.empty()) {
+        std::cout << "Generating GIF..." << std::endl;
+        try {
+            compression.formGIF();
+        } catch (const std::exception& e) {
+            std::cerr << "[Error] " << e.what() << std::endl;
+            return 1;
+        }
+    }
+    
     std::cout << "------------------------------------------------------------" << std::endl;
     std::cout << "Compression excecution time: " << ms.count() << "ms" << std::endl;
     std::cout << "Image size before compression: " << compression.getOriginalSize() << " bytes" << std::endl;

@@ -19,12 +19,15 @@ BIN_DIR		= bin
 LIBJPEG_DIR	= $(LIB_DIR)/libjpeg
 LIBZ_DIR	= $(LIB_DIR)/zlib
 LIBPNG_DIR	= $(LIB_DIR)/libpng
+GIFENCODER_DIR 	= $(LIB_DIR)/GifEncoder
+GIFLIB_DIR	= $(GIFENCODER_DIR)/giflib
 
 # Executable and library directory
 TARGET		= $(BIN_DIR)/main
 LIBJPEG		= $(LIBJPEG_DIR)/libjpeg.a
 LIBZ		= $(LIBZ_DIR)/libz.a
 LIBPNG		= $(LIBPNG_DIR)/libpng.a
+GIFENCODER	= $(GIFENCODER_DIR)/libgifencoder.a
 
 # Source files
 SRC_FILES	= $(wildcard src/*.cpp)
@@ -41,9 +44,11 @@ LIBZ_SRC	= $(addprefix $(LIBZ_DIR)/, adler32.c compress.c crc32.c deflate.c gzcl
 LIBPNG_SRC = $(addprefix $(LIBPNG_DIR)/, png.c pngerror.c pngget.c pngmem.c pngpread.c \
        pngread.c pngrio.c pngrtran.c pngrutil.c pngset.c \
        pngtrans.c pngwio.c pngwrite.c pngwtran.c pngwutil.c)
+GIFENCODER_SRC = $(addprefix $(GIFENCODER_DIR)/, GifEncoder.cpp algorithm/NeuQuant.cpp)
+GIFLIB_SRC = $(addprefix $(GIFLIB_DIR)/, dgif_lib.cpp egif_lib.cpp gif_err.cpp gif_hash.cpp gifalloc.cpp openbsd-reallocarray.cpp)
 
 # Compiler flags
-CPPFLAGS			= -I$(SRC_DIR) -I$(LIB_DIR) -I$(LIBJPEG_DIR) -I$(LIBZ_DIR) -I$(LIBPNG_DIR)
+CPPFLAGS			= -I$(SRC_DIR) -I$(LIB_DIR) -I$(LIBJPEG_DIR) -I$(LIBZ_DIR) -I$(LIBPNG_DIR) -I$(GIFENCODER_DIR)
 LIBJPEG_CPPFLAGS		= -I$(LIBJPEG_DIR)
 LIBZ_CPPFLAGS			= -I$(LIBZ_DIR) -O3 -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN
 # LIBPNG flags
@@ -61,14 +66,14 @@ LIBPNG_CFLAGS	= $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) -O2 # -g
 LIBPNG_FLAGS	= $(LIBPNG_CPPFLAGS) $(LIBPNG_CFLAGS) 
 
 # Linker flags. Order of -l matters.
-LDFLAGS			= -L$(LIBJPEG_DIR) -L$(LIBZ_DIR) -L$(LIBPNG_DIR) -lpng -ljpeg -lz 
+LDFLAGS			= -L$(LIBJPEG_DIR) -L$(LIBZ_DIR) -L$(LIBPNG_DIR) -L$(GIFENCODER_DIR) -lpng -ljpeg -lz -lgifencoder 
 
 all: lib build run
 
 build: $(SRC_FILES)
 	$(CXX) -o $(TARGET) $(SRC_FILES) $(CPPFLAGS) $(LDFLAGS)
 
-lib: jpeg z png
+lib: jpeg z png gifencoder
 
 run:
 	./$(TARGET)
@@ -113,3 +118,16 @@ png:
 	@$(AR) $(LIBPNG) $(LIBPNG_SRC:.c=.o)
 	@$(RANLIB) $(LIBPNG)
 	@echo "libpng built successfully"
+
+# libgifencoder.a
+# Includes a distribution of giflib
+gifencoder:
+	@for src in $(GIFENCODER_SRC); do \
+		$(CXX) -c $$src $(CPPFLAGS) -o $${src%.cpp}.o; \
+	done;
+	@for src in $(GIFLIB_SRC); do \
+		$(CXX) -c $$src $(CPPFLAGS) -o $${src%.cpp}.o; \
+	done;
+	@$(AR) $(GIFENCODER) $(GIFENCODER_SRC:.cpp=.o) $(GIFLIB_SRC:.cpp=.o)
+	@$(RANLIB) $(GIFENCODER)
+	@echo "GifEncoder built successfully"

@@ -6,6 +6,9 @@
 #define cimg_use_png 1      // Use libpng for PNG support
 #include "CImg.h"
 
+// GIF utility
+#include "GifEncoder.h"
+
 #include <stdexcept>
 
 typedef unsigned char Quantum;      // Unit of subpixel value
@@ -42,6 +45,9 @@ public:
 
     // Save the image to a file
     void save(std::string address);
+
+    // Push image into a GIF frame
+    void pushFrame(GifEncoder& gifEncoder, int delay) const;
     
     // For accessing pixel values
     class Iterator {

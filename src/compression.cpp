@@ -8,6 +8,9 @@ void Compression::validate() {
     if (config.outputImageAddress.empty()) {
         throw std::invalid_argument("Output image address is empty.");
     }
+    if (!config.outputGIFAddress.empty() && ".gif"!=std::filesystem::path(config.outputGIFAddress).extension().string()) {
+        throw std::invalid_argument("Output GIF address does not have .gif extension.");
+    }
     
     if (config.errorThreshold < 0) {
         throw std::invalid_argument("Error threshold cannot be negative.");
@@ -113,6 +116,40 @@ void Compression::save() {
     }
     compressedSize = calculateFileSize(config.outputImageAddress);
     compressionRatio = calculateCompressionRatio(originalSize, compressedSize);
+}
+
+// Form GIF image that visualizes the compression process
+void Compression::formGIF() {
+    if (!tree) {
+        throw std::runtime_error("Call compress() first.");
+    }
+
+    int quality = GIF_QUALITY;      // 66.7% quality. Best quality produce rather gorgeous gifs but takes a lot of time (10 frames require about 1 minute to process)
+    bool useGlobalColorMap = false; // Global color map would not look great accross all depths but color quantization is supposedly faster(?)
+    int loop = 0;                   // Endless loop
+    int preAllocSize = 0;           // No idea what this parameter would do but it works just fine
+    int delay = GIF_DELAY;         
+    int loopDelay = GIF_LOOP_DELAY;
+
+    // Create GIF encoder
+    GifEncoder gifEncoder;
+    if (!gifEncoder.open(config.outputGIFAddress, inputImage->getWidth(), inputImage->getHeight(), quality, useGlobalColorMap, loop, preAllocSize)) {
+        throw std::runtime_error("Failed to open GIF encoder.");
+    }
+
+    for (int i=1;i<=getTreeDepth();i++){
+        // Merge the tree at the current depth and save it as a GIF frame
+        auto gifImage = std::make_unique<Image>(tree->merge(i, false));
+        if (i==getTreeDepth()) {
+            gifImage->pushFrame(gifEncoder, loopDelay); // Last frame has longer delay
+        } else {
+            gifImage->pushFrame(gifEncoder, delay);
+        }
+    }
+
+    if (!gifEncoder.close()) {
+        throw std::runtime_error("Failed to close GIF encoder.");
+    }
 }
 
 // Compression information

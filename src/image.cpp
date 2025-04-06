@@ -73,6 +73,39 @@ void Image::save(std::string address) {
     img.save(address.c_str());
 }
 
+// Push image into a GIF frame
+void Image::pushFrame(GifEncoder& gifEncoder, int delay) const {
+    // Transform into interleaved RGB form
+    // CImg stores data in planar form like so R1R2R3...RnG1G2G3...GnB1B2B3...Bn
+    // GIF encoder requires interleaved format R1G1B1R2G2B2...RnGnBn
+    uint8_t* data = (uint8_t*)malloc(8 * img.width() * img.height() * 3);
+    if (data == nullptr) {
+        throw std::runtime_error("Failed to allocate memory for GIF frame.");
+    }
+    int pos = 0;
+    for (auto it = beginBlock(0, 0, img.height() - 1, img.width() - 1, Channels::RED);
+            it != endBlock(0, 0, img.height() - 1, img.width() - 1, Channels::RED); ++it) {
+        *(data+pos) = *it;
+        pos += 3;
+    }
+    pos = 1;
+    for (auto it = beginBlock(0, 0, img.height() - 1, img.width() - 1, Channels::GREEN);
+            it != endBlock(0, 0, img.height() - 1, img.width() - 1, Channels::GREEN); ++it) {
+        *(data+pos) = *it;
+        pos += 3;
+    }
+    pos = 2;
+    for (auto it = beginBlock(0, 0, img.height() - 1, img.width() - 1, Channels::BLUE);
+            it != endBlock(0, 0, img.height() - 1, img.width() - 1, Channels::BLUE); ++it) {
+        *(data+pos) = *it;
+        pos += 3;
+    }
+
+    // Immediately transform the data into intermediate buffer so data can be safely freed
+    gifEncoder.push(GifEncoder::PIXEL_FORMAT_RGB, data, img.width(), img.height(), delay);
+    free(data);
+}
+
 
 /* Iterator */
 // Modifiable iterator
