@@ -85,28 +85,31 @@ clean:
 #	jconfig.h		-> added typedef unsigned char boolean
 #	jmoreconfig.h	-> changed into 'typedef signed int INT32' due to conflict with windows type definition
 jpeg:
-	for src in $(LIBJPEG_SRC); do \
+	@for src in $(LIBJPEG_SRC); do \
         $(CC) -c $$src $(LIBJPEG_CPPFLAGS) -o $${src%.c}.o; \
-    done; \
-	$(AR) $(LIBJPEG) $(LIBJPEG_SRC:.c=.o)
-	$(RANLIB) $(LIBJPEG)
+    done;
+	@$(AR) $(LIBJPEG) $(LIBJPEG_SRC:.c=.o)
+	@$(RANLIB) $(LIBJPEG)
+	@echo "libjpeg built successfully"
 
 # libz.a
 # Ignore test programs (excludes minigzip for example)
 # There is a warning when compiling zlib on Windows. Ignore it with -w
 z:
-	for src in $(LIBZ_SRC); do \
+	@for src in $(LIBZ_SRC); do \
 		$(CC) -c $$src $(LIBZ_CPPFLAGS) -w -o $${src%.c}.o; \
-	done; \
-	$(AR) $(LIBZ) $(LIBZ_SRC:.c=.o)
-	$(RANLIB) $(LIBZ)
+	done;
+	@$(AR) $(LIBZ) $(LIBZ_SRC:.c=.o)
+	@$(RANLIB) $(LIBZ)
+	@echo "zlib built successfully"
 
 # libpng.a
 # libz.a is not included here so the final program must be linked against it
 # Ignore test programs (excludes pngtest, pngvalid, pngcp, pngcrush, pngfixup)
 png:
-	for src in $(LIBPNG_SRC); do \
+	@for src in $(LIBPNG_SRC); do \
 		$(CC) -c $$src $(LIBPNG_FLAGS)  -o $${src%.c}.o; \
 	done;
-	$(AR) $(LIBPNG) $(LIBPNG_SRC:.c=.o)
-	$(RANLIB) $(LIBPNG)
+	@$(AR) $(LIBPNG) $(LIBPNG_SRC:.c=.o)
+	@$(RANLIB) $(LIBPNG)
+	@echo "libpng built successfully"
