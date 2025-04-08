@@ -12,8 +12,8 @@ void Compression::validate() {
         throw std::invalid_argument("Output GIF address does not have .gif extension.");
     }
     
-    if (config.errorThreshold < 0) {
-        throw std::invalid_argument("Error threshold cannot be negative.");
+    if (!ErrorMetrics::validThreshold(config.errorThreshold, config.errorMethod)) {
+        throw std::invalid_argument("Invalid error threshold.");
     }
     if (config.minBlockArea < 1) {
         throw std::invalid_argument("Minimum block area must be at least 1.");

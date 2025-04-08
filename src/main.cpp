@@ -14,11 +14,12 @@ int main(){
                 << "1. Variance | "
                 << "2. Mean Absolute Deviation (MAD) | "
                 << "3. Max Pixel Difference | "
-                << "4. Entropy" << std::endl;
+                << "4. Entropy | "
+                << "5. SSIM" << std::endl;
 
     int errorMethodInput;
     std::cin >> errorMethodInput;
-    if (errorMethodInput < 1 || errorMethodInput > 4) {
+    if (errorMethodInput < 1 || errorMethodInput > 5) {
         std::cerr << "[Error] Invalid error method." << std::endl;
         return 1;
     }
