@@ -8,6 +8,7 @@ The program uses the following libraries
 - libpng
 - zlib
 - [GifEncoder](https://github.com/xiaozhuai/GifEncoder)
+
   
 The libraries are already provided in the `lib` directory. No further requirements or installation.
 
@@ -23,6 +24,7 @@ The program can be executed by either of these commands
 ```
 ./bin/main
 ./bin/main.exe
+
 ```
 Alternatively, the program can be executed by using `make`
 ```
