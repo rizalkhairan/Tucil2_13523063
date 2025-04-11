@@ -46,7 +46,7 @@ public:
             case ENTROPY:
                 return (r + g + b) / 3.0;
             case SSIM:
-                return 0.299 * r + 0.587 * g + 0.114 * b;
+                return 0.2989 * r + 0.5810 * g + 0.1140 * b;
             default:
                 return 0;
         }
