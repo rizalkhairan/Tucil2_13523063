@@ -8,7 +8,8 @@ enum ErrorMethod {
     VARIANCE = 1,
     MEAN_ABSOLUTE_DEVIATION = 2,
     MAX_PIXEL_DIFFERENCE = 3,
-    ENTROPY = 4
+    ENTROPY = 4,
+    SSIM = 5
 };
 
 class ErrorMetrics {
@@ -29,6 +30,8 @@ public:
                 return calculateMaxPixelDifference(begin, end);
             case ENTROPY:
                 return calculateEntropy(begin, end);
+            case SSIM:
+                return calculateSSIM(begin, end);
             default:
                 return 0;
         }
@@ -36,7 +39,50 @@ public:
 
     // Aggregates the error values of each channel into a single value
     static double calculateError(ErrorMethod method, double r, double g, double b) {
-        return (r + g + b) / 3;
+        switch (method) {
+            case VARIANCE:
+            case MEAN_ABSOLUTE_DEVIATION:
+            case MAX_PIXEL_DIFFERENCE:
+            case ENTROPY:
+                return (r + g + b) / 3.0;
+            case SSIM:
+                return 0.2989 * r + 0.5810 * g + 0.1140 * b;
+            default:
+                return 0;
+        }
+    }
+
+    // Check if the error is within a threshold
+    static bool belowThreshold(double error, double threshold, ErrorMethod method) {
+        switch (method) {
+            case VARIANCE:
+            case MEAN_ABSOLUTE_DEVIATION:
+            case MAX_PIXEL_DIFFERENCE:
+            case ENTROPY:
+                return error <= threshold;
+            case SSIM:
+                // For SSIM, we want to check if the error is greater than the threshold
+                // The closer to 1, the more similar/better
+                return error >= threshold;
+            default:
+                return true;
+        }
+    }
+
+    static bool validThreshold(double threshold, ErrorMethod method) {
+        switch (method) {
+            case VARIANCE:
+            case MEAN_ABSOLUTE_DEVIATION:
+            case MAX_PIXEL_DIFFERENCE:
+            case ENTROPY:
+                // Nonegative measure
+                return threshold >= 0;
+            case SSIM:
+                // For SSIM, the threshold should be between -1 and 1
+                return threshold >= -1 && threshold <= 1;
+            default:
+                return false;
+        }
     }
 
 private:
@@ -118,6 +164,20 @@ private:
         }
 
         return entropy;
+    }
+
+    template <typename Iterator>
+    static double calculateSSIM(Iterator begin, Iterator end) {
+        // SSIM
+        // Value: -1 to 1
+        // double C1 = 0.0001 * 65025;
+        const double C2 = 0.0009 * 255 * 255;
+
+        // Only the variance of the subblock matter
+        double var = calculateVariance(begin, end);
+
+        // Simplified formula
+        return C2 / (var + C2);
     }
 };
 

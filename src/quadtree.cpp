@@ -142,7 +142,7 @@ int QuadTree::divideNode(QuadTreeNode& node) {
             // If divided, the node will be smaller than the minimum block size
             node.isDivisible = false;
             count = 0;
-        } else if (node.error <= errorThreshold) {
+        } else if (ErrorMetrics::belowThreshold(node.error, errorThreshold, errorMethod)) {
             // The node is below the error threshold/the pixels are similar
             node.isDivisible = false;
             count = 0;
