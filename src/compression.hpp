@@ -43,7 +43,6 @@ public:
 
     // Compression. Form the compression tree and output image in memory
     void compress();
-    void compressTargeted();
 
     // Finalize the compression process and save the image
     void save();
