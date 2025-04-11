@@ -30,6 +30,9 @@ int main(){
 
     std::cout << "Enter minimum block area: ";
     std::cin >> config.minBlockArea;
+
+    std::cout << "Target compression ratio (enter 0 to disable): ";
+    std::cin >> config.compressionTarget;
     
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Clear the input buffer
     std::cout << "Enter the output image address: ";
@@ -47,10 +50,15 @@ int main(){
         return 1;
     }
     
-    std::cout << "Compressing image..." << std::endl;
     auto t1 = std::chrono::high_resolution_clock::now();
     
-    compression.compress();
+    if (config.compressionTarget > 0) {
+        std::cout << "Compressing image to target compression ratio..." << std::endl;
+        compression.compressTargeted();
+    } else {
+        std::cout << "Compressing image..." << std::endl;
+        compression.compress();
+    }
     
     auto t2 = std::chrono::high_resolution_clock::now();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1);
@@ -72,7 +80,7 @@ int main(){
     std::cout << "Compression excecution time: " << ms.count() << "ms" << std::endl;
     std::cout << "Image size before compression: " << compression.getOriginalSize() << " bytes" << std::endl;
     std::cout << "Image size after compression: " << compression.getCompressedSize() << " bytes" << std::endl;
-    std::cout << "Compression percentage: " << compression.getCompressionRatio() << "%" << std::endl;
+    std::cout << "Compression percentage: " << 100 * compression.getCompressionRatio() << "%" << std::endl;
     std::cout << "Tree depth: " << compression.getTreeDepth() << std::endl;
     std::cout << "Number of nodes: " << compression.getNodeCount() << std::endl;
     

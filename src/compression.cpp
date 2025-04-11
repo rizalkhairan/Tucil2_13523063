@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <iostream>
 #include "compression.hpp"
 
 void Compression::validate() {
@@ -18,6 +19,9 @@ void Compression::validate() {
     if (config.minBlockArea < 1) {
         throw std::invalid_argument("Minimum block area must be at least 1.");
     }
+    if (config.compressionTarget > 1.0 || config.compressionTarget < 0.0) {
+        throw std::invalid_argument("Compression target must be between 0 and 1.");
+    }
     
     if (config.compressionTarget < 0 || config.compressionTarget > 1) {
         throw std::invalid_argument("Compression target must be between 0 and 1.");
@@ -25,6 +29,7 @@ void Compression::validate() {
     
     try {
         inputImage = std::make_unique<Image>(config.inputImageAddress);
+        originalSize = calculateFileSize(config.inputImageAddress);
     } catch (const std::exception& e) {
         throw std::runtime_error("Failed to load input image: " + std::string(e.what()));
     }
@@ -56,46 +61,77 @@ void Compression::compressTargeted() {
         throw std::runtime_error("Compression not validated. Call validate() first.");
     }
 
-    // Binary search on error threshold
-    // File compression is complicated but assume that the error threshold is directly proportional to the compression ratio
-    std::unique_ptr<Image> midImage;
     std::unique_ptr<QuadTree> tempTree;
-    std::string midAddress="__temp3__"+config.extension;
-    double midRatio, bestRatio;
-    // Thresholds for binary search
-    double low = 0.0;
-    double high = 255 * 64;     // Seems to be an upper bound max error possible on edge test case. On real image, the iteration may converge more slowly
-    double mid;
-    double best = high;
-    
-    int MAX_ITERATIONS = 20;
-    double ERROR_TOLERANCE = 0.1;
-    long long originalSize = calculateFileSize(config.inputImageAddress);
-
+    std::string tempAddress1="bin/__temp1__"+config.extension;
+    std::string tempAddress2="bin/__temp2__"+config.extension;
     // Make a tree that fully divides the image into smallest possible blocks
-    tempTree = std::make_unique<QuadTree>(*inputImage, config.minBlockArea, low, config.errorMethod);
+    tempTree = std::make_unique<QuadTree>(*inputImage, 4, 0.0, config.errorMethod);
     tempTree->divideExhaust();
 
-    // Find the lowest ratio that is above the target ratio
+    // Gradient descent on threshold variable (letting block size be fixed probably good enough)
+    // Objective function = std::abs(currentRatio-config.compressionTarget)
+    // This function is dependent on the threshold variable
+    int trials = 5;
+    double initials[trials] = {0.8, 10, 20, 40, 80};
+    double currentThreshold, bestThreshold, bestDeltaRatio;
+    double currentRatio;
+    bestThreshold = initials[0];
+    bestDeltaRatio = 100; // Arbitrary large number
+    
+    int MAX_ITERATIONS = 15;
+    double RATIO_TOLERANCE = 0.01;  // 1% Ratio tolerance
+    double DELTA_THRESHOLD = 0.1;
+    double step = 0.5;
     int iteration = 0;
-    while (high - low > ERROR_TOLERANCE && iteration < MAX_ITERATIONS) {
-        mid = (high + low) / 2.0;
-        midImage = std::make_unique<Image>(tempTree->mergeThreshold(mid, false));
-        midImage->save(midAddress);
-        midRatio = calculateCompressionRatio(originalSize, calculateFileSize(midAddress));
-        
-        if (midRatio < config.compressionTarget) {
-            low = mid;
-        } else {
-            high = mid;
-            best = mid; // Save the best ratio found so far
+    for (int i=0;i<trials;i++) {
+        currentThreshold = initials[i];
+        tempTree->mergeThreshold(currentThreshold, false).save(tempAddress1);
+        currentRatio = calculateCompressionRatio(originalSize, calculateFileSize(tempAddress1));
+        bestThreshold = currentThreshold;
+        bestDeltaRatio = std::abs(currentRatio - config.compressionTarget);
+        while (std::abs(currentRatio-config.compressionTarget) > RATIO_TOLERANCE && iteration < MAX_ITERATIONS) {
+            tempTree->mergeThreshold(currentThreshold, false).save(tempAddress1);
+            currentRatio = calculateCompressionRatio(originalSize, calculateFileSize(tempAddress1));
+            if (std::abs(currentRatio - config.compressionTarget) < RATIO_TOLERANCE) {
+                break;  // Similar to the target ratio, stop iteration
+            }
+            
+            // Small step to measure gradient
+            tempTree->mergeThreshold(currentThreshold + DELTA_THRESHOLD, false).save(tempAddress2);
+            double deltaRatio = calculateCompressionRatio(originalSize, calculateFileSize(tempAddress2)) - currentRatio;
+            double gradient = deltaRatio / DELTA_THRESHOLD;
+            std::cout << iteration << " Gradient = " << gradient << std::endl;
+    
+            // Gradient descent step
+            currentThreshold -= step * gradient;
+            if (currentThreshold < 0) {
+                currentThreshold = 0;  // Avoid negative threshold
+            }
+    
+            // Store best value
+            if (std::abs(currentRatio - config.compressionTarget) < bestDeltaRatio) {
+                bestThreshold = currentThreshold;
+                bestDeltaRatio = std::abs(currentRatio - config.compressionTarget);
+            }
+    
+            iteration++;
         }
 
-        iteration++;
+        iteration = 0;
     }
 
+    std::cout << "Best threshold: " << bestThreshold << std::endl;
+    std::cout << "Best delta ratio: " << bestDeltaRatio << std::endl;
+    std::cout << "Current ratio: " << currentRatio << std::endl;
+    std::cout << "Current threshold: " << currentThreshold << std::endl;
+    std::cout << "Iterations: " << iteration << std::endl;
+
+    if (std::remove(tempAddress1.c_str()) != 0 || std::remove(tempAddress2.c_str()) != 0) {
+        throw std::runtime_error("Failed to delete temporary file: " + tempAddress1 + " or " + tempAddress2);
+    } 
     // Save the image with the highest ratio that is below the target ratio
-    tree = std::make_unique<QuadTree>(*inputImage, config.minBlockArea, best, config.errorMethod);
+    config.errorThreshold = bestThreshold;
+    tree = std::make_unique<QuadTree>(*inputImage, 4, bestThreshold, config.errorMethod);
     tree->divideExhaust();
     outputImage = std::make_unique<Image>(tree->merge(-1, false));
 }
@@ -108,7 +144,6 @@ void Compression::save() {
     }
 
     // Save the compressed image
-    originalSize = calculateFileSize(config.inputImageAddress);
     try {
         outputImage->save(config.outputImageAddress);
     } catch (const std::exception& e) {
@@ -165,7 +200,7 @@ double Compression::calculateCompressionRatio(long long originalSize, long long 
     if (originalSize == 0) {
         throw std::invalid_argument("Original size cannot be zero.");
     }
-    return 100 * (1 - ((double)compressedSize / (double)originalSize));
+    return (1 - ((double)compressedSize / (double)originalSize));
 }
 // Calculate file size
 long long Compression::calculateFileSize(const std::string& filePath) const {
